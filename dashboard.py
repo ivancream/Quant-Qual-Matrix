@@ -716,9 +716,9 @@ with tabs[4]:
                             row = {
                                 "代號": res["pure_id"],
                                 "收盤價": res["q_data"]['Close'],
+                                "均線多排": "V" if res["q_data"]['Details']['cond_d'] else "-",
                                 "開布林": "V" if res["q_data"]['Details']['cond_a'] else "-",
                                 "爆量表態": "V" if res["q_data"]['Details']['cond_c'] else "-",
-                                "均線多排": "V" if res["q_data"]['Details']['cond_d'] else "-",
                                 "月線斜率": res["q_data"]['MA20_Slope_Pct'],
                                 "上軌斜率": res["q_data"]['Upper_Slope_Pct'],
                                 "帶寬增長(%)": res["q_data"]['Bandwidth_Chg'],
