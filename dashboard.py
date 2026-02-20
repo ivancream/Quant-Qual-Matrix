@@ -544,7 +544,7 @@ with tabs[2]:
         # Also add spike lines for y-axis
         fig.update_yaxes(fixedrange=True, showspikes=True, spikemode='across', spikethickness=1, spikecolor='#888888', spikedash='dot')
         # Enable scroll zoom
-        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': False, 'displayModeBar': False})
+        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': False, 'displayModeBar': True})
         # Strategy Pulse Section (Below Chart)
         st.divider()
         sp_col1, sp_col2 = st.columns([3, 1])
@@ -832,7 +832,7 @@ with tabs[4]:
                 fig.update_yaxes(fixedrange=True, row=2, col=1)
                 return fig
             fig = plot_strategy_chart(df, pure_id)
-            st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': False, 'displayModeBar': False})
+            st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': False, 'displayModeBar': True})
             # AI Analysis Section
             st.divider()
             ba_col1, ba_col2 = st.columns([3, 1])
@@ -1053,7 +1053,7 @@ with tabs[5]:
                 s_fig.update_yaxes(fixedrange=True, row=2, col=1)
                 return s_fig
             s_fig = plot_short_chart(short_df, s_pure_id)
-            st.plotly_chart(s_fig, use_container_width=True, config={'scrollZoom': False, 'displayModeBar': False})
+            st.plotly_chart(s_fig, use_container_width=True, config={'scrollZoom': False, 'displayModeBar': True})
             # AI Analysis Section for Short
             st.divider()
             bs_col1, bs_col2 = st.columns([3, 1])
