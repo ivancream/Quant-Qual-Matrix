@@ -522,7 +522,7 @@ with tabs[2]:
         # We also need to ensure axes are linked properly if shared_axes is on.
         fig.update_layout(
             height=700, 
-            dragmode='zoom', 
+            dragmode=False, 
             template='plotly_dark', 
             xaxis_rangeslider_visible=False,
             margin={"l": 10, "r": 10, "t": 30, "b": 10},
@@ -544,7 +544,7 @@ with tabs[2]:
         # Also add spike lines for y-axis
         fig.update_yaxes(fixedrange=True, showspikes=True, spikemode='across', spikethickness=1, spikecolor='#888888', spikedash='dot')
         # Enable scroll zoom
-        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True})
+        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': False, 'displayModeBar': False})
         # Strategy Pulse Section (Below Chart)
         st.divider()
         sp_col1, sp_col2 = st.columns([3, 1])
@@ -832,7 +832,7 @@ with tabs[4]:
                 fig.update_yaxes(fixedrange=True, row=2, col=1)
                 return fig
             fig = plot_strategy_chart(df, pure_id)
-            st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True})
+            st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': False, 'displayModeBar': False})
             # AI Analysis Section
             st.divider()
             ba_col1, ba_col2 = st.columns([3, 1])
@@ -1053,7 +1053,7 @@ with tabs[5]:
                 s_fig.update_yaxes(fixedrange=True, row=2, col=1)
                 return s_fig
             s_fig = plot_short_chart(short_df, s_pure_id)
-            st.plotly_chart(s_fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True})
+            st.plotly_chart(s_fig, use_container_width=True, config={'scrollZoom': False, 'displayModeBar': False})
             # AI Analysis Section for Short
             st.divider()
             bs_col1, bs_col2 = st.columns([3, 1])
