@@ -18,22 +18,22 @@ from webdriver_manager.chrome import ChromeDriverManager
 from . import prompts
 
 # ==========================================
-# 1. 設定與工具函式 (Setup & Utils)
+# 1. 設�??�工?�函�?(Setup & Utils)
 # ==========================================
-# 使用 os.getenv 讀取環境變數
-# 使用 os.environ.get 讀取環境變數
+# 使用 os.getenv 讀?�環境�???
+# 使用 os.environ.get 讀?�環境�???
 # GEMINI_API_KEY is configured in main_app.py
 
 def get_model() -> genai.GenerativeModel:
-    model_id = os.getenv("GEMINI_MODEL_ID", "gemini-1.5-flash-latest")
+    model_id = os.getenv("GEMINI_MODEL_ID", "gemini-2.0-flash")
     return genai.GenerativeModel(model_id)
 
 def remove_emojis(text: str) -> str:
-    """ 移除 Emoji，保持報告專業度 """
+    """ 移除 Emoji，�??�報?��?業度 """
     return re.sub(r'[^\w\s,.:;!?()\[\]{}@#$%^&*\-+=/\\\'"<>~`|]', '', text)
 
 def calculate_technicals_str(hist_df: pd.DataFrame) -> str:
-    """ 計算技術指標並回傳格式化字串 (供 AI 閱讀) """
+    """ 計�??�術�?標並?�傳?��??��?�?(�?AI ?��?) """
     try:
         if len(hist_df) < 60: return "Data insufficient for technicals"
         
@@ -69,20 +69,20 @@ def calculate_technicals_str(hist_df: pd.DataFrame) -> str:
         return "Technical calculation error"
 
 # ==========================================
-# 2. 核心數據獲取 (Data Mining)
+# 2. ?��??��??��? (Data Mining)
 # ==========================================
 def get_stock_info(stock_code: str) -> Optional[Dict[str, Union[str, float]]]:
     """
-    獲取硬數據：股價、PE、ROE、技術指標
-    回傳: dict (包含所有關鍵數據)
+    ?��?硬數?��??�價?�PE?�ROE?��?術�?�?
+    ?�傳: dict (?�含?�?��??�數??
     """
     result: Dict[str, Union[str, float]] = {}
     
     try:
-        # 1. 處理代碼
+        # 1. ?��?�?��
         code = stock_code.strip().upper()
         if code.isdigit():
-            # 優先嘗試台灣上市，若無則嘗試上櫃 (這裡簡化邏輯)
+            # ?��??�試?�灣上�?，若?��??�試上�? (?�裡簡�??�輯)
             ticker = yf.Ticker(f"{code}.TW")
             hist = ticker.history(period="3mo")
             if hist.empty:
@@ -95,7 +95,7 @@ def get_stock_info(stock_code: str) -> Optional[Dict[str, Union[str, float]]]:
         if hist.empty:
             return None
 
-        # 2. 獲取基本面 (Fundamentals)
+        # 2. ?��??�本??(Fundamentals)
         info = ticker.info
         result['name'] = info.get('longName', code)
         
@@ -124,11 +124,11 @@ def get_stock_info(stock_code: str) -> Optional[Dict[str, Union[str, float]]]:
 
         fcf = info.get('freeCashflow')
         if fcf:
-            result['fcf'] = f"{fcf/1e8:.2f} 億" # 轉成億為單位
+            result['fcf'] = f"{fcf/1e8:.2f} ?? # 轉�??�為?��?
         else:
             result['fcf'] = "N/A"
         
-        # 3. 計算技術指標 (Technicals)
+        # 3. 計�??�術�?�?(Technicals)
         result['technicals'] = calculate_technicals_str(hist)
         
         return result
@@ -138,18 +138,18 @@ def get_stock_info(stock_code: str) -> Optional[Dict[str, Union[str, float]]]:
         return None
 
 # ==========================================
-# 3. 消息面爬蟲 (Sentiment Mining)
+# 3. 消息?�爬??(Sentiment Mining)
 # ==========================================
 
 def get_anue_news_selenium(keyword: str) -> str:
-    """ Anue 鉅亨網爬蟲 """
+    """ Anue ?�亨網爬??"""
     news_data = []
     chrome_options = Options()
-    # 使用新版 headless 模式，更加穩定
+    # 使用?��? headless 模�?，更?�穩�?
     chrome_options.add_argument("--headless=new") 
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--log-level=3")
-    # 忽略憑證錯誤與自動化控制提示
+    # 忽略?��??�誤?�自?��??�制?�示
     chrome_options.add_argument("--ignore-certificate-errors")
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     
@@ -172,7 +172,7 @@ def get_anue_news_selenium(keyword: str) -> str:
     return "\n".join(news_data) if news_data else "No specific news on Anue."
 
 def get_yahoo_news_selenium(stock_code_full: str) -> str:
-    """ Yahoo 股市爬蟲 """
+    """ Yahoo ?��??�蟲 """
     news_data = []
     chrome_options = Options()
     chrome_options.add_argument("--headless=new") 
@@ -183,8 +183,8 @@ def get_yahoo_news_selenium(stock_code_full: str) -> str:
     
     driver = None
     try:
-        # 如果是數字代碼，需要加上 .TW 或 .TWO，這裡假設使用者輸入完整代碼或由外部處理
-        # 為了保險起見，若只傳入數字，補上 .TW
+        # 如�??�數字代碼�??�要�?�?.TW ??.TWO，這裡?�設使用?�輸?��??�代碼�??��??��???
+        # ?��?保險起�?，若?�傳?�數字�?補�? .TW
         target = stock_code_full
         if target.isdigit():
              target = f"{target}.TW"
@@ -197,7 +197,7 @@ def get_yahoo_news_selenium(stock_code_full: str) -> str:
         titles = driver.find_elements(By.TAG_NAME, "h3")
         for title in titles:
             text = title.text.strip()
-            if text and len(text) > 8 and "廣告" not in text:
+            if text and len(text) > 8 and "�??" not in text:
                 news_data.append(f"- [Yahoo] {text}")
                 if len(news_data) >= 3: break
     except Exception: pass
@@ -206,7 +206,7 @@ def get_yahoo_news_selenium(stock_code_full: str) -> str:
     return "\n".join(news_data) if news_data else "No specific news on Yahoo."
 
 def get_ptt_sentiment(clean_code: str) -> str:
-    """ PTT Stock 版爬蟲 """
+    """ PTT Stock ?�爬??"""
     headers = {'User-Agent': 'Mozilla/5.0', 'Cookie': 'over18=1'}
     url = f"https://www.ptt.cc/bbs/Stock/search?q={clean_code}"
     posts = []
@@ -218,9 +218,9 @@ def get_ptt_sentiment(clean_code: str) -> str:
             try:
                 title = div.find('div', class_='title').text.strip()
                 date_str = div.find('div', class_='date').text.strip()
-                # 簡單判斷是否為近期 (這裡簡化邏輯)
+                # 簡單?�斷?�否?��???(?�裡簡�??�輯)
                 posts.append(f"- [{date_str}] {title}")
-                if i >= 4: # 取得 5 篇後停止
+                if i >= 4: # ?��? 5 篇�??�止
                     break
             except: continue
     except Exception: pass
@@ -228,16 +228,16 @@ def get_ptt_sentiment(clean_code: str) -> str:
 
 def get_sentiment_summary(stock_code: str) -> Dict[str, str]:
     """
-    整合新聞與 PTT 爬蟲
-    回傳: dict (包含 'anue', 'yahoo', 'ptt' 三種來源的摘要字串)
+    ?��??��???PTT ?�蟲
+    ?�傳: dict (?�含 'anue', 'yahoo', 'ptt' 三種來�??��?要�?�?
     """
     summary = {'anue': '', 'yahoo': '', 'ptt': ''}
     
-    # 處理代碼與名稱 (簡單處理，實際可能需要對照表)
+    # ?��?�?��?��?�?(簡單?��?，實?�可?��?要�??�表)
     clean_code = stock_code.replace(".TW", "").replace(".TWO", "")
     
     if clean_code.isdigit():
-        # 如果是數字代碼，可能需要去查中文名稱來搜新聞 (這裡簡化直接用代碼搜)
+        # 如�??�數字代碼�??�能?�要去?�中?��?稱�??�新??(?�裡簡�??�接?�代碼�?)
         search_keyword = clean_code 
     else:
         search_keyword = clean_code
@@ -249,11 +249,11 @@ def get_sentiment_summary(stock_code: str) -> Dict[str, str]:
     return summary
 
 # ==========================================
-# 4. AI 報告生成 (AI Synthesis)
+# 4. AI ?��??��? (AI Synthesis)
 # ==========================================
 def generate_ai_report(stock_code: str, data_info: Dict, sentiment_summary: Dict) -> str:
     """
-    整合數據與情緒，生成 Markdown 報告
+    ?��??��??��?緒�??��? Markdown ?��?
     """
     model = get_model()
     today = datetime.now().strftime("%Y-%m-%d")
@@ -281,11 +281,11 @@ def generate_ai_report(stock_code: str, data_info: Dict, sentiment_summary: Dict
 
 def chat_with_analyst(user_msg: str, context_report: str, history: list = []) -> str:
     """
-    讓使用者針對報告進行提問 (支援對話記憶)
+    讓使?�者�?對報?�進�??��? (?�援對話記憶)
     """
     model = get_model()
     
-    # 建構對話歷史字串
+    # 建�?對話歷史字串
     history_text = ""
     for msg in history:
         role = "User" if msg['role'] == "user" else "Analyst"

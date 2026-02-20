@@ -17,7 +17,7 @@ from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 
 # ==========================================
-# 設定與常數
+# 設�??�常??
 # GEMINI_API_KEY is configured in dashboard.py
 
 MARKET_MAP = {
@@ -31,21 +31,21 @@ MARKET_MAP = {
 from . import prompts
 
 def get_model() -> genai.GenerativeModel:
-    model_id = os.getenv("GEMINI_MODEL_ID", "gemini-1.5-flash-latest")
+    model_id = os.getenv("GEMINI_MODEL_ID", "gemini-2.0-flash")
     return genai.GenerativeModel(model_id)
 
 # ==========================================
-# 1. 市場數據 (Market Metrics)
+# 1. 市場?��? (Market Metrics)
 # ==========================================
 def get_market_metrics(market_name: str) -> Tuple[str, str]:
     """
-    抓取指定市場的最新指數與漲跌幅
-    回傳: (metrics_str, status_str)
+    ?��??��?市場?��??��??��?漲�?�?
+    ?�傳: (metrics_str, status_str)
     """
     symbol = MARKET_MAP.get(market_name, "^TWII")
     try:
         ticker = yf.Ticker(symbol)
-        # 用 5 天數據避免遇到假日或休市導致無數據
+        # ??5 天數?�避?��??��??��?休�?導致?�數??
         hist = ticker.history(period="5d")
         
         if hist.empty:
@@ -58,7 +58,7 @@ def get_market_metrics(market_name: str) -> Tuple[str, str]:
         
         metrics = f"{last_close:,.0f} ({pct_change:+.2f}%)"
         
-        # 簡單趨勢判斷
+        # 簡單趨勢?�斷
         status = "Bullish" if pct_change > 0.5 else ("Bearish" if pct_change < -0.5 else "Neutral")
         
         return metrics, status
@@ -66,16 +66,16 @@ def get_market_metrics(market_name: str) -> Tuple[str, str]:
         return f"Error: {e}", "Error"
 
 # ==========================================
-# 2. 宏觀數據 (Macro & FX)
+# 2. 宏�??��? (Macro & FX)
 # ==========================================
 def get_short_term_data() -> Dict[str, str]:
     """
-    短線攻擊力道 (Daily):
-    1. 台幣匯率 (USDTWD)
-    2. VIX (恐慌指數)
-    3. 10年美債殖利率 (US 10Y)
-    4. 黃金 (Gold)
-    回傳: Dict with keys ('twd', 'vix', 'bond', 'gold')
+    ?��??��??��? (Daily):
+    1. ?�幣?��? (USDTWD)
+    2. VIX (?��??�數)
+    3. 10年�??��??��? (US 10Y)
+    4. 黃�? (Gold)
+    ?�傳: Dict with keys ('twd', 'vix', 'bond', 'gold')
     """
     data = {"twd": "N/A", "vix": "N/A", "bond": "N/A", "gold": "N/A"}
     try:
@@ -114,7 +114,7 @@ def get_short_term_data() -> Dict[str, str]:
 import re
 
 def _fetch_rss_headlines(query: str, max_items: int = 10) -> list:
-    """ 回傳 list of (pub_date, title) from Google News RSS """
+    """ ?�傳 list of (pub_date, title) from Google News RSS """
     base_url = "https://news.google.com/rss/search"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
     params = {"q": query, "hl": "zh-TW", "gl": "TW", "ceid": "TW:zh-Hant"}
@@ -133,9 +133,9 @@ def _fetch_rss_headlines(query: str, max_items: int = 10) -> list:
 
 def _extract_number_from_headlines(headlines: list, patterns: list) -> str:
     """
-    嘗試從標題列表中用 Regex 直接找出數字。
+    ?�試從�?題�?表中??Regex ?�接?�出?��???
     patterns: list of regex pattern strings
-    回傳第一個找到的匹配結果，找不到回傳 None
+    ?�傳第�??�找?��??��?結�?，找不到?�傳 None
     """
     for _, title in headlines:
         for pattern in patterns:
@@ -146,34 +146,34 @@ def _extract_number_from_headlines(headlines: list, patterns: list) -> str:
 
 def get_long_term_data() -> Dict[str, str]:
     """
-    波段持股水位 (Monthly): US CPI, TW Export, PMI, Light Signal
-    策略: Regex 實字抓取為主， AI 補充分析為辅
+    波段?�股水�? (Monthly): US CPI, TW Export, PMI, Light Signal
+    策略: Regex 實�??��??�主�?AI 補�??��??��?
     """
-    results = {"cpi": "需查詢", "export": "需查詢", "pmi": "需查詢", "signal": "需查詢"}
+    results = {"cpi": "?�?�詢", "export": "?�?�詢", "pmi": "?�?�詢", "signal": "?�?�詢"}
 
     # ---- 1. US CPI ----
-    headlines = _fetch_rss_headlines("美國 CPI 年增率")
-    # 充分考慮中文標題中的 "年增x%" 、"CPI年增x%" 、"CPI x%" 之類
+    headlines = _fetch_rss_headlines("美�? CPI 年�???)
+    # ?��??�慮中�?標�?中�? "年�?x%" ??CPI年�?x%" ??CPI x%" 之�?
     val = _extract_number_from_headlines(headlines, [
-        r'年增[率]?\s*([\d.]+\s*%)',
+        r'年�?[?�]?\s*([\d.]+\s*%)',
         r'CPI[^\d]*([\d.]+\s*%)',
         r'([\d.]+)\s*%.*CPI',
     ])
     if val:
         results["cpi"] = val
     else:
-        # AI 備案
+        # AI ?��?
         try:
             news_text = "\n".join(f"[{d}] {t}" for d, t in headlines[:5])
             model = get_model()
-            r = model.generate_content(f"從以下新聞找出美國最近一期CPI年增率的實際數值，直接回傳數字如 3.2%，沒有就回傳空白：\n{news_text}")
+            r = model.generate_content(f"從以下新?�找?��??��?近�??�CPI年�??��?實�??�值�??�接?�傳?��?�?3.2%，�??�就?�傳空白：\n{news_text}")
             v = r.text.strip()
             if re.search(r'[\d.]+\s*%', v):
                 results["cpi"] = v
         except: pass
 
     # ---- 2. US PMI ----
-    headlines = _fetch_rss_headlines("美國 ISM 製造業 PMI")
+    headlines = _fetch_rss_headlines("美�? ISM 製造業 PMI")
     val = _extract_number_from_headlines(headlines, [
         r'PMI[^\d]*([\d.]+)',
         r'([\d.]+)[^\d]*PMI',
@@ -186,19 +186,19 @@ def get_long_term_data() -> Dict[str, str]:
             news_text = "\n".join(f"[{d}] {t}" for d, t in headlines[:5])
             model = get_model()
             r = model.generate_content(
-                f"從以下新聞找出美國最近一期ISM製造業PMI的實際數字。"
-                f"只請輸出純數字（例如: 48.5），不要任何文字。找不到就回傳空白：\n{news_text}"
+                f"從以下新?�找?��??��?近�??�ISM製造業PMI?�實?�數字�?
+                f"?��?輸出純數字�?例�?: 48.5）�?不�?任�??��??�找不到就�??�空?��?\n{news_text}"
             )
-            v = r.text.strip()[:10]  # 截斷保護
+            v = r.text.strip()[:10]  # ?�斷保護
             m = re.search(r'[\d.]+', v)
             if m:
                 results["pmi"] = m.group(0)
         except: pass
 
-    # ---- 3. 台灣外銷訂單 ----
-    headlines = _fetch_rss_headlines("台灣 外銷訂單 年增率")
+    # ---- 3. ?�灣外銷訂單 ----
+    headlines = _fetch_rss_headlines("?�灣 外銷訂單 年�???)
     val = _extract_number_from_headlines(headlines, [
-        r'年[增减減][率]?\s*([\+\-]?[\d.]+\s*%)',
+        r'年[增�?減][?�]?\s*([\+\-]?[\d.]+\s*%)',
         r'([\+\-]?[\d.]+\s*%).*外銷',
         r'外銷[^\d]*([\d.]+\s*%)',
     ])
@@ -208,38 +208,38 @@ def get_long_term_data() -> Dict[str, str]:
         try:
             news_text = "\n".join(f"[{d}] {t}" for d, t in headlines[:5])
             model = get_model()
-            r = model.generate_content(f"從以下新聞找出台灣最近一期外銷訂單年增率的實際數值，直接回傳如 +5.2% 或 -1.3%，沒有就回傳空白：\n{news_text}")
+            r = model.generate_content(f"從以下新?�找?�台???近�??��??��??�年增�??�實?�數?��??�接?�傳�?+5.2% ??-1.3%，�??�就?�傳空白：\n{news_text}")
             v = r.text.strip()
             if re.search(r'[\d.]+\s*%', v):
                 results["export"] = v
         except: pass
 
-    # ---- 4. 台灣景氣燈號 ----
-    headlines = _fetch_rss_headlines("台灣 景氣燈號 分數")
-    # 先傳燈號名稱
+    # ---- 4. ?�灣?�氣?��? ----
+    headlines = _fetch_rss_headlines("?�灣 ?�氣?��? ?�數")
+    # ?�傳?��??�稱
     val = _extract_number_from_headlines(headlines, [
-        r'((?:紅|黃紅|黃|綠|藍|低迷|熱絡)[燈])[^\d]{0,10}(\d+)[\s分]',
-        r'(\d+)[\s分].*?((?:紅|黃紅|黃|綠|藍)[燈])',
+        r'((?:紅|黃�?|黃|綠|?�|低迷|?�絡)[?�])[^\d]{0,10}(\d+)[\s?�]',
+        r'(\d+)[\s?�].*?((?:紅|黃�?|黃|綠|??[?�])',
     ])
     if val:
         results["signal"] = val
     else:
-        # 先在標題裡找 燈+分數 組合
+        # ?�在標�?裡找 ???�數 組�?
         for _, title in headlines[:8]:
-            m = re.search(r'((?:紅|黃紅|黃|綠|藍)燈)[^0-9]{0,15}([0-9]+)[分分]', title)
+            m = re.search(r'((?:紅|黃�?|黃|綠|????[^0-9]{0,15}([0-9]+)[?��?]', title)
             if m:
-                results["signal"] = f"{m.group(1)} {m.group(2)}分"
+                results["signal"] = f"{m.group(1)} {m.group(2)}??
                 break
-            m2 = re.search(r'([0-9]+)[分分][^0-9]{0,5}((?:紅|黃紅|黃|綠|藍)燈)', title)
+            m2 = re.search(r'([0-9]+)[?��?][^0-9]{0,5}((?:紅|黃�?|黃|綠|????', title)
             if m2:
-                results["signal"] = f"{m2.group(2)} {m2.group(1)}分"
+                results["signal"] = f"{m2.group(2)} {m2.group(1)}??
                 break
         
-        if results["signal"] == "需查詢":
+        if results["signal"] == "?�?�詢":
             try:
                 news_text = "\n".join(f"[{d}] {t}" for d, t in headlines[:5])
                 model = get_model()
-                r = model.generate_content(f"從以下新聞找出台灣最近一期景氣燈號與分數，直接回傳如 綠燈24分 或 黃紅燈35分，沒有就回傳空白：\n{news_text}")
+                r = model.generate_content(f"從以下新?�找?�台???近�??�景�???��??�數，直?��??��? 綠�?24????黃�???5?��?沒�?就�??�空?��?\n{news_text}")
                 v = r.text.strip()
                 if v:
                     results["signal"] = v
@@ -252,7 +252,7 @@ def get_long_term_data() -> Dict[str, str]:
 
 def get_fx_data(market_name: str) -> str:
     """
-    抓取區域報告所需的匯率 (USDTWD, JPY, HKD)
+    ?��??�?�報?��??�?�匯??(USDTWD, JPY, HKD)
     """
     try:
         if "TAIEX" in market_name or "TW" in market_name: 
@@ -274,7 +274,7 @@ def get_fx_data(market_name: str) -> str:
         return "N/A"
 
 # ==========================================
-# 3. 新聞爬蟲 (News)
+# 3. ?��??�蟲 (News)
 # ==========================================
 def get_investing_news(market_name: str) -> str:
     """
@@ -345,11 +345,11 @@ def get_investing_news(market_name: str) -> str:
                 pass
 
 # ==========================================
-# 4. AI 報告
+# 4. AI ?��?
 # ==========================================
 def generate_global_report(market: str, metrics: str, macro: str, fx: str, commodities: str, news: str) -> str:
     """
-    綜合宏觀數據生成報告
+    綜�?宏�??��??��??��?
     """
     model = get_model()
     prompt = prompts.get_global_report_prompt(market, metrics, macro, fx, commodities, news)
@@ -361,28 +361,28 @@ def generate_global_report(market: str, metrics: str, macro: str, fx: str, commo
 
 def chat_with_global_analyst(user_msg: str, report_context: str, chat_history: List[Dict]) -> str:
     """
-    與全球宏觀策略師進行對談
+    ?�全?��?觀策略師進�?對�?
     """
     model = get_model()
-    # 建立對談歷史格式，只包含最近幾次以節省 Token 並維持一致性
+    # 建�?對�?歷史?��?，只?�含?�近幾次以節??Token 並維?��??��?
     history = []
-    for m in chat_history[-10:]: # 取最近 10 則
+    for m in chat_history[-10:]: # ?��?�?10 ??
         history.append({"role": "user" if m["role"] == "user" else "model", "parts": [m["content"]]})
     
     chat = model.start_chat(history=history)
     
     prompt = f"""
-    你是剛才撰寫這份報告的「全球宏觀策略師」。
-    初始報告內容如下作為背景：
+    你是?��??�寫?�份?��??�「全?��?觀策略師」�?
+    ?��??��??�容如�?作為?�景�?
     {report_context}
     
-    請針對使用者的問題進行專業、客觀且具備洞察力的回答。若問題涉及特定的投資建議，請維持中立並強調風險。
-    使用繁體中文回答。
+    請�?對使?�者�??��??��?專業?�客觀且具?��?察�??��?答。若?��?涉�??��??��?資建議�?請維?�中立並強調風險??
+    使用繁�?中�??��???
     
-    使用者問題：{user_msg}
+    使用?��?題�?{user_msg}
     """
     try:
         response = chat.send_message(prompt)
         return response.text
     except Exception as e:
-        return f"對談出錯: {e}"
+        return f"對�??�錯: {e}"
