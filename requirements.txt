@@ -1,0 +1,10 @@
+streamlit
+pandas
+plotly
+google-generativeai
+python-dotenv
+yfinance
+Pillow
+requests
+beautifulsoup4
+# selenium  # 如果你有用到 Selenium 爬蟲，部署到 Cloud 會需要額外設定環境，建議先用 yfinance

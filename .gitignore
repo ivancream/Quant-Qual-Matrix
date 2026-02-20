@@ -1,0 +1,8 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.streamlit/config.toml
+# 不要上傳 secretos，這要在 Streamlit Cloud 背景設定
+.streamlit/secrets.toml
