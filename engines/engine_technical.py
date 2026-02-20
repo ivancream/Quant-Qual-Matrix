@@ -35,21 +35,30 @@ def fetch_data(stock_id: str, period: str = "1y") -> Optional[pd.DataFrame]:
     """
     # 處理台股代碼後綴
     stock_id = str(stock_id).strip()
-    if stock_id.isdigit():
-        symbol = f"{stock_id}.TW"
-    elif not stock_id.endswith(".TW") and not stock_id.endswith(".TWO"):
-        symbol = f"{stock_id}.TW"
-    else:
-        symbol = stock_id
-        
-    print(f"正在抓取 {symbol}...")
-    try:
-        df = yf.download(symbol, period=period, progress=False, auto_adjust=False)
-    except Exception as e:
-        print(f"下載失敗: {e}")
-        return None
+    symbols_to_try = []
     
-    if df.empty:
+    if stock_id.isdigit():
+        symbols_to_try = [f"{stock_id}.TW", f"{stock_id}.TWO"]
+    elif not stock_id.endswith(".TW") and not stock_id.endswith(".TWO"):
+        symbols_to_try = [f"{stock_id}.TW", f"{stock_id}.TWO"]
+    else:
+        symbols_to_try = [stock_id]
+        
+    df = None
+    final_symbol = symbols_to_try[0]
+    
+    for sym in symbols_to_try:
+        try:
+            print(f"正在嘗試抓取 {sym}...")
+            df = yf.download(sym, period=period, progress=False, auto_adjust=False)
+            if df is not None and not df.empty:
+                final_symbol = sym
+                break
+        except Exception as e:
+            print(f"嘗試 {sym} 失敗: {e}")
+            continue
+    
+    if df is None or df.empty:
         return None
         
     # 處理 MultiIndex (yfinance 新版問題)
@@ -89,18 +98,21 @@ def fetch_data(stock_id: str, period: str = "1y") -> Optional[pd.DataFrame]:
         
     return df
 
-def get_symbol_name(stock_id: str) -> str:
-    """ 嘗試獲取股票名稱 """
     try:
         stock_id = str(stock_id).strip()
-        if stock_id.isdigit():
-            sym = f"{stock_id}.TW"
-        else:
-            sym = stock_id
-        ticker = yf.Ticker(sym)
-        # 嘗試從不同欄位獲取名稱
-        name = ticker.info.get('longName') or ticker.info.get('shortName') or ""
-        return name
+        symbols = [f"{stock_id}.TW", f"{stock_id}.TWO"] if stock_id.isdigit() else [stock_id]
+        
+        for sym in symbols:
+            ticker = yf.Ticker(sym)
+            try:
+                # 嘗試從特定欄位獲取名稱
+                info = ticker.info
+                name = info.get('longName') or info.get('shortName')
+                if name:
+                    return name
+            except:
+                continue
+        return ""
     except:
         return ""
 
