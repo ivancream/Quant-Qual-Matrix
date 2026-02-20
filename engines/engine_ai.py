@@ -1,23 +1,23 @@
 # engines/engine_ai.py
 """
-統�? AI 對話引�? (Unified AI Brain)
+統一 AI 對話引擎 (Unified AI Brain)
 
-?��?說�?�?
-- 維護以「股票代?�」為?��?跨模�?Context 彙整 (Brain)
-- 每個�??�模組�??��?，�??��?注入 Brain
-- ?�?��?話都帶�???Brain Context，�? AI ?��??�戶?��?模�??�究了�?�?
-- Streamlit ?��? session_state ?��???Brain ?�??
+架構說明：
+- 維護以「股票代號」為鍵的跨模組 Context 彙整 (Brain)
+- 每個分析模組完成後，將摘要注入 Brain
+- 所有對話都帶完整 Brain Context，讓 AI 知道用戶在各模組研究了什麼
+- Streamlit 透過 session_state 持久化 Brain 狀態
 
-Brain 結�? (存於 st.session_state.ai_brain)�?
+Brain 結構 (存於 st.session_state.ai_brain)：
 {
     "active_ticker": "2330",
     "contexts": {
         "2330": {
             "fundamental": "P/E 15x...",
-            "technical":   "RSI=65, MA多�?...",
-            "chips":       "主�?�??3000�?..",
-            "band_long":   "?��??? 上�??��? 0.35%...",
-            "band_short":  "?��?下�?, 跌破?��?..."
+            "technical":   "RSI=65, MA多排...",
+            "chips":       "主力賣超3000張...",
+            "band_long":   "開布林, 上軌斜率 0.35%...",
+            "band_short":  "月線下彎, 跌破月線..."
         }
     },
     "chat_history": [
@@ -35,19 +35,19 @@ from . import prompts
 
 
 # ==========================================
-# 模�??�稱對�?（用?�顯示�? Prompt 中�?
+# 模組名稱對應（用於顯示與 Prompt 中）
 # ==========================================
 MODULE_LABELS: Dict[str, str] = {
-    "fundamental": "?�本??/ 財報?��?",
-    "technical":   "?�術�?標�???,
-    "chips":       "籌碼?��???,
+    "fundamental": "基本面 / 財報分析",
+    "technical":   "技術指標分析",
+    "chips":       "籌碼面分析",
     "band_long":   "波段多方策略",
     "band_short":  "波段空方策略",
 }
 
 
 def _get_model() -> genai.GenerativeModel:
-    """?��? Gemini 模�?實�???""
+    """取得 Gemini 模型實例。"""
     model_id = os.getenv("GEMINI_MODEL_ID", "gemini-flash-latest")
     return genai.GenerativeModel(
         model_id,
@@ -58,11 +58,11 @@ def _get_model() -> genai.GenerativeModel:
 
 
 # ==========================================
-# Brain ?��??�數
+# Brain 操作函數
 # ==========================================
 
 def get_empty_brain() -> Dict[str, Any]:
-    """?�傳一?��?始�??�空 Brain 結�???""
+    """回傳一個初始化的空 Brain 結構。"""
     return {
         "active_ticker": None,
         "contexts": {},
@@ -72,17 +72,17 @@ def get_empty_brain() -> Dict[str, Any]:
 
 def update_context(brain: Dict, ticker: str, module: str, summary: str) -> Dict:
     """
-    將�?模�??��??��?要注??Brain??
-    每次?��?完�?後呼?��?�?AI ?��?續�?話中?��??��?
+    將某模組的分析摘要注入 Brain。
+    每次分析完成後呼叫，讓 AI 在後續對話中能引用。
 
     Args:
-        brain:   ?��???Brain dict (來自 session_state)
-        ticker:  ?�票�?? (e.g. "2330.TW")
-        module:  模�??�稱 ("fundamental", "technical", etc.)
-        summary: 該模組�??��??��? (?�以??AI ?��??�數?��?�?
+        brain:   現有的 Brain dict (來自 session_state)
+        ticker:  股票代號 (e.g. "2330.TW")
+        module:  模組名稱 ("fundamental", "technical", etc.)
+        summary: 該模組的文字摘要 (可以是 AI 報告或數據字串)
 
     Returns:
-        ?�新後�? Brain dict
+        更新後的 Brain dict
     """
     if ticker not in brain["contexts"]:
         brain["contexts"][ticker] = {}
@@ -93,18 +93,18 @@ def update_context(brain: Dict, ticker: str, module: str, summary: str) -> Dict:
 
 def build_context_string(brain: Dict, ticker: str) -> str:
     """
-    �?Brain 中�??�股票�??�?�模�?Context ?��??��?�?AI ?��??��?串�?
+    將 Brain 中某支股票的所有模組 Context 整合成一段 AI 可讀的字串。
 
     Args:
         brain:  Brain dict
-        ticker: ?�票�??
+        ticker: 股票代號
 
     Returns:
-        ?��?後�? Context 字串
+        整合後的 Context 字串
     """
     ctx = brain.get("contexts", {}).get(ticker, {})
     if not ctx:
-        return "（目?��??�其他模組�??��?資�?�?
+        return "（目前尚無其他模組的分析資料）"
 
     parts = []
     for module_key, label in MODULE_LABELS.items():
@@ -115,7 +115,7 @@ def build_context_string(brain: Dict, ticker: str) -> str:
 
 
 # ==========================================
-# ?��??�能?�數
+# 核心功能函數
 # ==========================================
 
 def initial_report(
@@ -127,18 +127,18 @@ def initial_report(
     custom_prompt_override: Optional[str] = None
 ) -> str:
     """
-    ?��??��??��??��?，自?�整??Brain 中�??�已?��?跨模�?Context??
+    生成初始分析報告，自動整合 Brain 中所有已知的跨模組 Context。
 
     Args:
         brain:                 Brain dict (來自 session_state)
-        ticker:                ?�票�??
-        module:                ?��??�叫?�模組�?�?
-        new_data:              ?�模組�??�?�數?��?�?
-        images:                ?��??��? (籌碼??，傳??PIL Image list
-        custom_prompt_override: ?��?定�??�接使用�?Prompt 覆�??�設 Prompt
+        ticker:                股票代號
+        module:                當前呼叫的模組名稱
+        new_data:              本模組的最新數據字串
+        images:                若有圖片 (籌碼圖)，傳入 PIL Image list
+        custom_prompt_override: 若指定，直接使用此 Prompt 覆蓋預設 Prompt
 
     Returns:
-        AI ?��??�報?��?�?
+        AI 回覆的報告文字
     """
     model = _get_model()
     cross_context = build_context_string(brain, ticker)
@@ -151,13 +151,13 @@ def initial_report(
 
     try:
         if images:
-            # Vision 模�?（含?��?�?
+            # Vision 模式（含圖片）
             response = model.generate_content([prompt] + images)
         else:
             response = model.generate_content(prompt)
         return response.text
     except Exception as e:
-        return f"AI ?��?失�?：{e}"
+        return f"AI 分析失敗：{e}"
 
 
 def chat(
@@ -166,35 +166,35 @@ def chat(
     user_input: str,
 ) -> Tuple[str, Dict]:
     """
-    帶�??�跨模�?記憶?��?話�?覆�?
+    帶完整跨模組記憶的對話回覆。
 
     Args:
         brain:      Brain dict (來自 session_state)
-        ticker:     ?�票�??
-        user_input: ?�戶輸入
+        ticker:     股票代號
+        user_input: 用戶輸入
 
     Returns:
-        (AI ?��??��?, ?�新後�? Brain dict)
+        (AI 回覆文字, 更新後的 Brain dict)
     """
     model = _get_model()
     cross_context = build_context_string(brain, ticker)
 
-    # 建�?對話歷史字串
+    # 建構對話歷史字串
     history_text = ""
     for msg in brain.get("chat_history", []):
-        role = "?�戶" if msg["role"] == "user" else "?��?�?
+        role = "用戶" if msg["role"] == "user" else "分析師"
         history_text += f"{role}: {msg['content']}\n\n"
 
-    # 使用 prompts.py 中�?統�??�示�?
+    # 使用 prompts.py 中的統一提示詞
     prompt = prompts.get_unified_chat_prompt(ticker, cross_context, history_text, user_input)
 
     try:
         response = model.generate_content(prompt)
         reply = response.text
     except Exception as e:
-        reply = f"?��?失�?：{e}"
+        reply = f"回覆失敗：{e}"
 
-    # ?�新對話歷史
+    # 更新對話歷史
     brain["chat_history"].append({"role": "user", "content": user_input})
     brain["chat_history"].append({"role": "assistant", "content": reply})
 
@@ -207,8 +207,8 @@ def stream_chat(
     user_input: str,
 ) -> Tuple[Any, Dict]:
     """
-    Streaming ?�本?��?話。�???(generator, brain_updater_fn)??
-    ?��?�?
+    Streaming 版本的對話。回傳 (generator, brain_updater_fn)。
+    用法：
         stream, update_fn = engine_ai.stream_chat(brain, ticker, q)
         reply = st.write_stream(stream)
         st.session_state.ai_brain = update_fn(reply)
@@ -218,7 +218,7 @@ def stream_chat(
 
     history_text = ""
     for msg in brain.get("chat_history", []):
-        role = "?�戶" if msg["role"] == "user" else "?��?�?
+        role = "用戶" if msg["role"] == "user" else "分析師"
         history_text += f"{role}: {msg['content']}\n\n"
 
     prompt = prompts.get_unified_chat_prompt(ticker, cross_context, history_text, user_input)
@@ -229,7 +229,7 @@ def stream_chat(
                 if chunk.text:
                     yield chunk.text
         except Exception as e:
-            yield f"?��?失�?：{e}"
+            yield f"回覆失敗：{e}"
 
     def _update_brain(reply: str) -> Dict:
         brain["chat_history"].append({"role": "user", "content": user_input})
@@ -248,8 +248,8 @@ def stream_initial_report(
     custom_prompt_override: Optional[str] = None
 ) -> Any:
     """
-    Streaming ?�本?��?始報?��??��?
-    ?��?：reply = st.write_stream(engine_ai.stream_initial_report(...))
+    Streaming 版本的初始報告生成。
+    用法：reply = st.write_stream(engine_ai.stream_initial_report(...))
     """
     model = _get_model()
     cross_context = build_context_string(brain, ticker)
@@ -263,7 +263,7 @@ def stream_initial_report(
     def _generator():
         try:
             if images:
-                # Vision 模�?不支??streaming，直?��???
+                # Vision 模式不支援 streaming，直接回傳
                 response = model.generate_content([prompt] + images)
                 yield response.text
             else:
@@ -271,19 +271,19 @@ def stream_initial_report(
                     if chunk.text:
                         yield chunk.text
         except Exception as e:
-            yield f"AI ?��?失�?：{e}"
+            yield f"AI 生成失敗：{e}"
 
     return _generator()
 
 
 def clear_chat(brain: Dict) -> Dict:
-    """清除對話歷史（�?保�? Context）�?""
+    """清除對話歷史（但保留 Context）。"""
     brain["chat_history"] = []
     return brain
 
 
 def clear_ticker_context(brain: Dict, ticker: str) -> Dict:
-    """清除?�支?�票?��???Context（�??��?究�??��???""
+    """清除某支股票的所有 Context（重新研究時用）。"""
     if ticker in brain.get("contexts", {}):
         del brain["contexts"][ticker]
     brain["chat_history"] = []

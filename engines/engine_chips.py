@@ -6,10 +6,10 @@ from typing import List, Union, Dict, Any
 from . import prompts
 
 # ==========================================
-# 設�??�
+# 設定區
 # ==========================================
-# 使用 os.getenv 讀?�環境�???
-# 使用 os.environ.get 讀?�環境�???
+# 使用 os.getenv 讀取環境變數
+# 使用 os.environ.get 讀取環境變數
 # GEMINI_API_KEY is configured in main_app.py
 
 def get_vision_model() -> genai.GenerativeModel:
@@ -19,12 +19,12 @@ def get_vision_model() -> genai.GenerativeModel:
 def analyze_chips_image(uploaded_files: List[Any], stock_symbol: str, tech_data: Dict[str, Any] = None, is_short: bool = False) -> str:
 
     """
-    ?�收 Streamlit 上傳?��??��?案�?表�??�傳 AI ?��?結�?
+    接收 Streamlit 上傳的圖片檔案列表，回傳 AI 分析結果
     """
     print(f"Starting chips analysis for {stock_symbol} with {len(uploaded_files)} images...")
     model = get_vision_model()
     
-    # 準�??��?資�?
+    # 準備圖片資料
     image_parts = []
     for uploaded_file in uploaded_files:
         try:
@@ -34,31 +34,31 @@ def analyze_chips_image(uploaded_files: List[Any], stock_symbol: str, tech_data:
             image_parts.append(image)
         except Exception as e:
             print(f"Error opening image: {e}")
-            return f"?��?讀?�失?? {e}"
+            return f"圖片讀取失敗: {e}"
         
     if not image_parts:
-        return "?�檢測到?��?，�?上傳籌碼?��??��???
+        return "未檢測到圖片，請上傳籌碼分佈截圖。"
 
     
-    # ?�斷?�否?��?術面?��?模�?
+    # 判斷是否為技術面整合模式
     if tech_data:
-        # 建�??�術面 Context String
+        # 建構技術面 Context String
         tech_context = f"""
-        **已�?算�??�術面?��??�考�?**
-        * ?�盤?? {tech_data.get('Close', 'N/A')}
-        * 布�?帶寬變�?: {tech_data.get('Bandwidth_Chg', 'N/A')}%
-        * 上�??��?: {tech_data.get('Upper_Slope_Pct', tech_data.get('Slope_Pct', 'N/A'))}%
-        * ?��??��?: {tech_data.get('MA20_Slope_Pct', 'N/A')}%
-        * ?�交?��?: {tech_data.get('Vol_Ratio', 'N/A')}??
-        * 上�?位置: {tech_data.get('Pos_Upper', 'N/A')}%
+        **已計算的技術面分析參考：**
+        * 收盤價: {tech_data.get('Close', 'N/A')}
+        * 布林帶寬變動: {tech_data.get('Bandwidth_Chg', 'N/A')}%
+        * 上軌斜率: {tech_data.get('Upper_Slope_Pct', tech_data.get('Slope_Pct', 'N/A'))}%
+        * 月線斜率: {tech_data.get('MA20_Slope_Pct', 'N/A')}%
+        * 成交量比: {tech_data.get('Vol_Ratio', 'N/A')}倍
+        * 上軌位置: {tech_data.get('Pos_Upper', 'N/A')}%
         """
-        # ?��?模�??��??�示�?
+        # 根據模式選擇提示詞
         if is_short:
             prompt = prompts.get_band_short_analysis_prompt(tech_context)
         else:
             prompt = prompts.get_band_long_analysis_prompt(tech_context)
     else:
-        # 純�?碼模�?
+        # 純籌碼模式
         prompt = prompts.get_chips_analysis_prompt(stock_symbol)
 
     try:
@@ -68,4 +68,4 @@ def analyze_chips_image(uploaded_files: List[Any], stock_symbol: str, tech_data:
         return response.text
     except Exception as e:
         print(f"Gemini API Error: {e}")
-        return f"AI ?��?失�?: {e}"
+        return f"AI 分析失敗: {e}"

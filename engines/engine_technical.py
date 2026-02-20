@@ -9,31 +9,31 @@ from typing import Tuple, List, Dict, Optional, Any
 from . import prompts
 import pandas_ta as ta
 
-# 常用權值股中�??�稱對照�?(??yfinance ?��??�中?��??��?�?
+# 常用權值股中文名稱對照表 (當 yfinance 抓不到中文時的備案)
 TW_NAMES = {
-    "2330.TW": "?��???, "2317.TW": "鴻海", "2454.TW": "?�發�?, 
-    "2603.TW": "?�榮", "2609.TW": "?��?", "2615.TW": "?�海",
-    "2303.TW": "?�電", "2881.TW": "富邦??, "2882.TW": "?�泰??,
-    "2412.TW": "中華??, "2308.TW": "?��???, "6669.TW": "緯�?",
-    "3037.TW": "�??", "2337.TW": "?��?", "2301.TW": "?�寶�?,
-    "2357.TW": "?�碩", "2382.TW": "�??", "3231.TW": "緯創",
-    "2376.TW": "?�??, "2377.TW": "微�?", "2610.TW": "?�航",
-    "2618.TW": "?�榮??, "2834.TW": "?��??�", "2884.TW": "?�山??,
-    "2886.TW": "?��???
+    "2330.TW": "台積電", "2317.TW": "鴻海", "2454.TW": "聯發科", 
+    "2603.TW": "長榮", "2609.TW": "陽明", "2615.TW": "萬海",
+    "2303.TW": "聯電", "2881.TW": "富邦金", "2882.TW": "國泰金",
+    "2412.TW": "中華電", "2308.TW": "台達電", "6669.TW": "緯穎",
+    "3037.TW": "欣興", "2337.TW": "旺宏", "2301.TW": "光寶科",
+    "2357.TW": "華碩", "2382.TW": "廣達", "3231.TW": "緯創",
+    "2376.TW": "技嘉", "2377.TW": "微星", "2610.TW": "華航",
+    "2618.TW": "長榮航", "2834.TW": "臺企銀", "2884.TW": "玉山金",
+    "2886.TW": "兆豐金"
 }
 
 # ==========================================
-# 設�? Gemini API Key
+# 設定 Gemini API Key
 # ==========================================
-# 使用 os.getenv 讀?�環境�???
-# 使用 os.environ.get 讀?�環境�???
+# 使用 os.getenv 讀取環境變數
+# 使用 os.environ.get 讀取環境變數
 # GEMINI_API_KEY is configured in main_app.py
 
 def fetch_data(stock_id: str, period: str = "1y") -> Optional[pd.DataFrame]:
     """
-    ?��??�價並進�?資�?清�?
+    抓取股價並進行資料清洗
     """
-    # ?��??�股�?��後綴
+    # 處理台股代碼後綴
     stock_id = str(stock_id).strip()
     symbols_to_try = []
     
@@ -49,22 +49,22 @@ def fetch_data(stock_id: str, period: str = "1y") -> Optional[pd.DataFrame]:
     
     for sym in symbols_to_try:
         try:
-            print(f"�?��?�試?��? {sym}...")
+            print(f"正在嘗試抓取 {sym}...")
             df = yf.download(sym, period=period, progress=False, auto_adjust=False)
             if df is not None and not df.empty:
                 final_symbol = sym
                 break
         except Exception as e:
-            print(f"?�試 {sym} 失�?: {e}")
+            print(f"嘗試 {sym} 失敗: {e}")
             continue
     
     if df is None or df.empty:
         return None
         
-    # ?��? MultiIndex (yfinance ?��??��?)
+    # 處理 MultiIndex (yfinance 新版問題)
     if isinstance(df.columns, pd.MultiIndex):
         try:
-            # ?�試?�接?�維，若?��??��? Ticker，level 1 ?�常??Ticker ?�稱
+            # 嘗試直接降維，若只有單一 Ticker，level 1 通常是 Ticker 名稱
             if symbol in df.columns.get_level_values(1):
                 df = df.xs(symbol, axis=1, level=1)
             else:
@@ -72,13 +72,13 @@ def fetch_data(stock_id: str, period: str = "1y") -> Optional[pd.DataFrame]:
         except:
              df.columns = df.columns.get_level_values(0)
     
-    # 強制將索引�???Datetime 並移?��??�資�? (?��?後�?繪�??��?)
+    # 強制將索引轉為 Datetime 並移除時區資訊 (避免後續繪圖問題)
     if isinstance(df.index, pd.DatetimeIndex):
          df.index = df.index.tz_localize(None)
     else:
          df.index = pd.to_datetime(df.index).tz_localize(None)
     
-    # ???�鍵修正：檢?��?要�?位是?��???
+    # ✅ 關鍵修正：檢查必要欄位是否存在
     # Standardize columns to simplify check
     df.columns = [c.capitalize() for c in df.columns]
     
@@ -87,10 +87,10 @@ def fetch_data(stock_id: str, period: str = "1y") -> Optional[pd.DataFrame]:
     
     missing_cols = [c for c in required_cols if c not in df.columns]
     if missing_cols:
-        print(f"缺�?必�?欄�?: {missing_cols}")
+        print(f"缺少必要欄位: {missing_cols}")
         return None
 
-    # 移除任�??��? NaN ?��? (確�?沒�?空數?�日)
+    # 移除任何含有 NaN 的列 (確保沒有空數據日)
     df.dropna(subset=required_cols, inplace=True)
     
     if df.empty:
@@ -99,7 +99,7 @@ def fetch_data(stock_id: str, period: str = "1y") -> Optional[pd.DataFrame]:
     return df
 
 def get_symbol_name(stock_id: str) -> str:
-    """ ?�試?��??�票?�稱 """
+    """ 嘗試獲取股票名稱 """
     try:
         stock_id = str(stock_id).strip()
         symbols = [f"{stock_id}.TW", f"{stock_id}.TWO"] if stock_id.isdigit() else [stock_id]
@@ -107,7 +107,7 @@ def get_symbol_name(stock_id: str) -> str:
         for sym in symbols:
             ticker = yf.Ticker(sym)
             try:
-                # ?�試從特定�?位獲?��?�?
+                # 嘗試從特定欄位獲取名稱
                 info = ticker.info
                 name = info.get('longName') or info.get('shortName')
                 if name:
@@ -120,20 +120,20 @@ def get_symbol_name(stock_id: str) -> str:
 
 def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """
-    計�??�術�?標�?MA(5,10,20,60), BB(20,2), MACD, RSI, OBV
+    計算技術指標：MA(5,10,20,60), BB(20,2), MACD, RSI, OBV
     """
     data = df.copy()
     
-    # 1. ?��? (MA)
+    # 1. 均線 (MA)
     data['MA5'] = data['Close'].rolling(window=5).mean()
     data['MA10'] = data['Close'].rolling(window=10).mean()
-    data['MA20'] = data['Close'].rolling(window=20).mean() # ?��?
-    data['MA60'] = data['Close'].rolling(window=60).mean() # �??
+    data['MA20'] = data['Close'].rolling(window=20).mean() # 月線
+    data['MA60'] = data['Close'].rolling(window=60).mean() # 季線
     
-    # 2. 乖離??(Bias)
+    # 2. 乖離率 (Bias)
     data['Bias_20'] = ((data['Close'] - data['MA20']) / data['MA20']) * 100
     
-    # 3. 布�??��? (Bollinger Bands) - 20MA ?�中�?
+    # 3. 布林通道 (Bollinger Bands) - 20MA 為中軌
     std20 = data['Close'].rolling(window=20).std()
     data['BB_Upper'] = data['MA20'] + (std20 * 2)
     data['BB_Lower'] = data['MA20'] - (std20 * 2)
@@ -146,14 +146,14 @@ def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
     data['Signal'] = data['MACD'].ewm(span=9, adjust=False).mean()
     data['Hist'] = data['MACD'] - data['Signal']
     
-    # 5. RSI (14??
+    # 5. RSI (14日)
     delta = data['Close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
     rs = gain / loss
     data['RSI'] = 100 - (100 / (1 + rs))
     
-    # 6. OBV (?��?�? - Check if Volume exists
+    # 6. OBV (能量潮) - Check if Volume exists
     if 'Volume' in data.columns:
         data['Price_Change'] = data['Close'].diff()
         data['Direction'] = np.where(data['Price_Change'] > 0, 1, 
@@ -167,12 +167,12 @@ def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
         # Also ensure Volume column exists for plotting
         data['Volume'] = 0.0
 
-    # 7. KD ?��? (9, 3, 3)
+    # 7. KD 指標 (9, 3, 3)
     low_9 = data['Low'].rolling(window=9).min()
     high_9 = data['High'].rolling(window=9).max()
     rsv = ((data['Close'] - low_9) / (high_9 - low_9)) * 100
     
-    # ?��???K, D ??50
+    # 初始化 K, D 為 50
     k = 50.0
     d = 50.0
     k_list = []
@@ -195,7 +195,7 @@ def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
 def get_latest_summary(df: pd.DataFrame) -> Dict[str, Any]:
     """
-    ?��??�後�?筆�??��? AI 使用
+    提取最後一筆資料供 AI 使用
     """
     last = df.iloc[-1]
     
@@ -214,33 +214,33 @@ def get_latest_summary(df: pd.DataFrame) -> Dict[str, Any]:
 
 def get_initial_analysis(df: pd.DataFrame, symbol: str) -> Tuple[str, List]:
     """
-    ?��?第�?輪�??�術�???(系統主�??�起)
-    ?�傳: (response_text, chat_history)
+    產生第一輪的技術分析 (系統主動發起)
+    回傳: (response_text, chat_history)
     """
-    # 準�??��?
+    # 準備數據
     cols = ['Close', 'Volume', 'MA5', 'MA20', 'MACD', 'Hist', 'RSI', 'BB_Width']
     available_cols = [c for c in cols if c in df.columns]
     data_for_ai = df.tail(5)[available_cols].to_markdown()
     
-    # System Prompt (?��?設�?，�?�?AI 人設)
+    # System Prompt (隱藏設定，定義 AI 人設)
     system_instruction = prompts.get_technical_analysis_prompt(symbol, data_for_ai)
     
     try:
-        # 使用 generate_content 模�? (stateless) 以避??session ?��?
+        # 使用 generate_content 模式 (stateless) 以避免 session 卡住
         model_id = os.getenv("GEMINI_MODEL_ID", "gemini-flash-latest")
         model = genai.GenerativeModel(model_id)
         
-        prompt = f"{system_instruction}\n\n請�?始�??��?術�??��?"
+        prompt = f"{system_instruction}\n\n請開始你的技術分析："
         response = model.generate_content(prompt)
         
-        # ?��?建�??��?歷史紀??List[Dict]
-        # ?�含系統?�令作為?�景?��? (?�然 chat history ?�常?��? user/model�?
-        # 但為了延�?context，�??��? system_instruction ?�含?�第一?��??��? context 中�?
-        # ?�是之�? continue_chat ?��??��???prompt)
+        # 手動建立初始歷史紀錄 List[Dict]
+        # 包含系統指令作為背景知識 (雖然 chat history 通常只有 user/model，
+        # 但為了延續 context，我們將 system_instruction 隱含在第一則回應的 context 中，
+        # 或是之後 continue_chat 時將其加入 prompt)
         
-        # ?�裡?�傳??history 結�??��?簡單??list dict
+        # 這裡回傳的 history 結構改成簡單的 list dict
         initial_history = [
-            {"role": "user", "content": f"?��? {symbol} ?��?術面?��?:\n{data_for_ai}"},
+            {"role": "user", "content": f"分析 {symbol} 的技術面數據:\n{data_for_ai}"},
             {"role": "model", "content": response.text}
         ]
         
@@ -255,13 +255,13 @@ def get_initial_analysis(df: pd.DataFrame, symbol: str) -> Tuple[str, List]:
 
 def continue_chat(user_input: str, history: List[Dict[str, str]]) -> Tuple[str, List[Dict[str, str]]]:
     """
-    延�?對話 (Stateless 模�?)
+    延續對話 (Stateless 模式)
     history: List of dicts [{'role': 'user'|'model', 'content': text}, ...]
     """
     try:
         model = genai.GenerativeModel('gemini-flash-latest')
         
-        # 建�??�含歷史紀?��? Prompt
+        # 建構包含歷史紀錄的 Prompt
         conversation_context = ""
         for msg in history:
             role_name = "User" if msg['role'] == "user" else "AI Analyst"
@@ -271,7 +271,7 @@ def continue_chat(user_input: str, history: List[Dict[str, str]]) -> Tuple[str, 
         
         response = model.generate_content(final_prompt)
         
-        # ?�新歷史紀??
+        # 更新歷史紀錄
         new_history = history + [
             {"role": "user", "content": user_input},
             {"role": "model", "content": response.text}
@@ -291,7 +291,7 @@ class BollingerStrategy:
             
         df = df.copy()
         try:
-            # ?�本?��?
+            # 基本均線
             df['MA5'] = ta.sma(df['Close'], length=5)
             df['MA10'] = ta.sma(df['Close'], length=10)
             df['MA20'] = ta.sma(df['Close'], length=20)
@@ -343,7 +343,7 @@ class BollingerStrategy:
         upper_slope_pct = upper_slope_raw * 100
         cond_b = upper_slope_raw > upper_slope_threshold
         
-        # ?��??��?
+        # 月線斜率
         ma20_slope_raw = (today['MA20'] - yesterday['MA20']) / yesterday['MA20'] if yesterday['MA20'] != 0 else 0
         ma20_slope_pct = ma20_slope_raw * 100
 
@@ -356,8 +356,8 @@ class BollingerStrategy:
         
         cond_c = is_red and is_touching and is_vol_surge
         
-        # 4. ?��?多�?檢查 (MA5 > MA10 > MA20 > MA60)
-        # ?�確�??��??�都存在 (??NaN)
+        # 4. 均線多排檢查 (MA5 > MA10 > MA20 > MA60)
+        # 需確保均線值都存在 (非 NaN)
         has_mas = all(not pd.isna(today[col]) for col in ['MA5', 'MA10', 'MA20', 'MA60'])
         if has_mas:
             cond_d = (today['MA5'] > today['MA10']) and \
@@ -387,11 +387,11 @@ class BollingerStrategy:
     @classmethod
     def analyze_short(cls, df):
         """
-        波段空方策略 (?��?乖離??:
-        1. ?��?下�? (MA20 Slope < 0)
-        2. ?��??��? (ma5 < ma10)
-        3. ?��?�?(ma5 < ma20)
-        4. �??/?�年線�??��?
+        波段空方策略 (支撐乖離版):
+        1. 月線下彎 (MA20 Slope < 0)
+        2. 破十日線 (ma5 < ma10)
+        3. 破月線 (ma5 < ma20)
+        4. 季線/半年線乖離率
         """
         df = cls.calculate_indicators(df)
         
@@ -402,25 +402,25 @@ class BollingerStrategy:
         today = df.iloc[-1]
         yesterday = df.iloc[-2]
         
-        # 1. ?��?下�?
+        # 1. 月線下彎
         ma20_slope = (today['MA20'] - yesterday['MA20']) / yesterday['MA20'] if yesterday['MA20'] != 0 else 0
         cond_ma20_down = ma20_slope < 0
         
-        # 2. ?��??��? (ma5 < ma10)
+        # 2. 破十日線 (ma5 < ma10)
         cond_ma5_lt_ma10 = today['MA5'] < today['MA10']
         
-        # 3. ?��?�?(ma5 < ma20)
+        # 3. 破月線 (ma5 < ma20)
         cond_ma5_lt_ma20 = today['MA5'] < today['MA20']
         
-        # 4. �??乖離??
+        # 4. 季線乖離率
         ma60_val = today['MA60']
         ma60_bias = (today['Close'] - ma60_val) / ma60_val * 100 if ma60_val > 0 else 0
         
-        # 5. ?�年線�??��?
+        # 5. 半年線乖離率
         ma120_val = today['MA120']
         ma120_bias = (today['Close'] - ma120_val) / ma120_val * 100 if ma120_val > 0 else 0
         
-        # 趨勢條件: ?�本?�檻�?保�??�盤?��?線�?
+        # 趨勢條件: 基本門檻仍保留收盤在月線下
         is_match = today['Close'] < today['MA20']
         
         quant_data = {
@@ -443,7 +443,7 @@ class BollingerStrategy:
 @st.cache_data(ttl=3600)
 def get_stock_data_with_name(ticker):
     """
-    ?��??�票?��?並�???(df, real_ticker, display_ticker)
+    獲取股票數據並回傳 (df, real_ticker, display_ticker)
     """
     try:
         t = str(ticker).strip()
@@ -463,7 +463,7 @@ def get_stock_data_with_name(ticker):
                 continue
         
         if not df.empty:
-            # ?��?�?Ticker.info ?��??�稱
+            # 優先從 Ticker.info 抓取名稱
             name = ""
             try:
                 stock_obj = yf.Ticker(final_t)
@@ -472,7 +472,7 @@ def get_stock_data_with_name(ticker):
             except:
                 name = ""
             
-            # 清�?�??顯示 (移除 .TW .TWO)
+            # 清理代號顯示 (移除 .TW .TWO)
             pure_id = final_t.replace(".TW", "").replace(".TWO", "")
             
             return df.reset_index(), final_t, pure_id, name
