@@ -31,7 +31,7 @@ MARKET_MAP = {
 from . import prompts
 
 def get_model() -> genai.GenerativeModel:
-    model_id = os.getenv("GEMINI_MODEL_ID", "gemini-2.0-flash")
+    model_id = os.getenv("GEMINI_MODEL_ID", "gemini-flash-latest")
     return genai.GenerativeModel(model_id)
 
 # ==========================================

@@ -227,7 +227,7 @@ def get_initial_analysis(df: pd.DataFrame, symbol: str) -> Tuple[str, List]:
     
     try:
         # ä½¿ç”¨ generate_content æ¨¡å? (stateless) ä»¥é¿??session ?¡ä?
-        model_id = os.getenv("GEMINI_MODEL_ID", "gemini-2.0-flash")
+        model_id = os.getenv("GEMINI_MODEL_ID", "gemini-flash-latest")
         model = genai.GenerativeModel(model_id)
         
         prompt = f"{system_instruction}\n\nè«‹é?å§‹ä??„æ?è¡“å??ï?"

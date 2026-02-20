@@ -25,7 +25,7 @@ from . import prompts
 # GEMINI_API_KEY is configured in main_app.py
 
 def get_model() -> genai.GenerativeModel:
-    model_id = os.getenv("GEMINI_MODEL_ID", "gemini-2.0-flash")
+    model_id = os.getenv("GEMINI_MODEL_ID", "gemini-flash-latest")
     return genai.GenerativeModel(model_id)
 
 def remove_emojis(text: str) -> str:

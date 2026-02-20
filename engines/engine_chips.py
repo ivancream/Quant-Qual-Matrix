@@ -13,7 +13,7 @@ from . import prompts
 # GEMINI_API_KEY is configured in main_app.py
 
 def get_vision_model() -> genai.GenerativeModel:
-    model_id = os.getenv("GEMINI_MODEL_ID", "gemini-2.0-flash")
+    model_id = os.getenv("GEMINI_MODEL_ID", "gemini-flash-latest")
     return genai.GenerativeModel(model_id)
 
 def analyze_chips_image(uploaded_files: List[Any], stock_symbol: str, tech_data: Dict[str, Any] = None, is_short: bool = False) -> str:

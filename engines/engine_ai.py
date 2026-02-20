@@ -48,7 +48,7 @@ MODULE_LABELS: Dict[str, str] = {
 
 def _get_model() -> genai.GenerativeModel:
     """?–å? Gemini æ¨¡å?å¯¦ä???""
-    model_id = os.getenv("GEMINI_MODEL_ID", "gemini-2.0-flash")
+    model_id = os.getenv("GEMINI_MODEL_ID", "gemini-flash-latest")
     return genai.GenerativeModel(
         model_id,
         generation_config=genai.types.GenerationConfig(
