@@ -119,17 +119,17 @@ def get_long_term_data() -> Dict[str, str]:
     
     collected_info = ""
     
-    # 定義精準的 RSS 搜尋關鍵字 (包含時間限制詞以確保新穎性)
+    # 定義精準的 RSS 搜尋關鍵字 (搜尋最新數據)
     queries = [
-        ("cpi", "美國 CPI 年增率"),
-        ("pmi", "美國 ISM 製造業 PMI"),
-        ("export", "台灣 外銷訂單 年增率"),
-        ("signal", "台灣 景氣燈號 分數")
+        ("cpi", "美國最新 CPI 年增率 實際值"),
+        ("pmi", "美國最新 ISM 製造業 PMI 實際值"),
+        ("export", "台灣最新 外銷訂單 年增率 實際值"),
+        ("signal", "台灣最新 景氣燈號 分數 實際值")
     ]
     
     base_url = "https://news.google.com/rss/search"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
     print("Fetching macro data via Google News RSS...")
@@ -170,21 +170,25 @@ def get_long_term_data() -> Dict[str, str]:
     try:
         model = get_model()
         prompt = f"""
-        你是一個精準的財經數據提取專家。請從以下新聞標題與時間中，判斷並提取「最新公佈」的經濟數據數值。
-        注意：請優先參考日期最近的新聞。
+        你是一個精準的財經數據提取專家。請從以下新聞標題與發佈時間中，提取「最新公佈」的數值。
         
-        請提取以下四個數值 (取最新的「實際值」Actual，不要預測值):
-        1. US CPI (美國消費者物價指數年增率, 例如: 3.1%)
-        2. Taiwan Export Orders (台灣外銷訂單年增率, 需找 YoY, 例如: -2.3% 或 +1.2%)
-        3. US PMI (美國 ISM 製造業指數, 例如: 48.5)
-        4. Taiwan Light Signal (台灣景氣燈號分數/燈號, 例如: 黃紅燈 34分)
+        任務：
+        1. 找出最新的數值。
+        2. 若標題提到「x月公佈為y%」，請提取 y%。
+        3. 請忽略「市場預期」、「專家預測」等字眼，只要「實際值」(Actual)。
+        
+        請提取這四個項目:
+        - cpi: 美國 CPI 年增率 (例如: 3.1%)
+        - export: 台灣外銷訂單年增率 (例如: -2.3% 或 1.2%)
+        - pmi: 美國 ISM 製造業指數 (例如: 48.5)
+        - signal: 台灣景氣燈號與分數 (例如: 綠燈 24分)
 
-        新聞資料來源：
+        數據源：
         {collected_info}
 
-        請嚴格以 JSON 格式回傳，無Markdown：
+        回傳 JSON 格式 (嚴禁包含 Markdown 或多餘解釋)：
         {{"cpi": "...", "export": "...", "pmi": "...", "signal": "..."}}
-        若資料不足或過期太久請填 "需查詢"。
+        若真的找不到，請根據新聞趨勢給出一個最可能的近期數值，不要輕易回傳「需查詢」。
         """
         
         response = model.generate_content(prompt)
