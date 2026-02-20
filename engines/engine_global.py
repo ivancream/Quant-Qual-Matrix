@@ -1,9 +1,13 @@
 import os
 import time
+import re
+import requests
+import xml.etree.ElementTree as ET
 import yfinance as yf
 import pandas as pd
 import google.generativeai as genai
 from typing import Dict, List, Tuple, Any
+
 
 # Selenium Imports
 from selenium import webdriver
@@ -107,64 +111,143 @@ def get_short_term_data() -> Dict[str, str]:
         print(f"Short term data error: {e}")
         return data
 
-import requests
-import xml.etree.ElementTree as ET
+import re
+
+def _fetch_rss_headlines(query: str, max_items: int = 10) -> list:
+    """ 回傳 list of (pub_date, title) from Google News RSS """
+    base_url = "https://news.google.com/rss/search"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+    params = {"q": query, "hl": "zh-TW", "gl": "TW", "ceid": "TW:zh-Hant"}
+    try:
+        resp = requests.get(base_url, params=params, headers=headers, timeout=10)
+        root = ET.fromstring(resp.content)
+        results = []
+        for item in root.findall(".//item")[:max_items]:
+            title = item.find("title")
+            pub   = item.find("pubDate")
+            if title is not None and title.text:
+                results.append((pub.text[:16] if pub is not None and pub.text else "", title.text))
+        return results
+    except:
+        return []
+
+def _extract_number_from_headlines(headlines: list, patterns: list) -> str:
+    """
+    嘗試從標題列表中用 Regex 直接找出數字。
+    patterns: list of regex pattern strings
+    回傳第一個找到的匹配結果，找不到回傳 None
+    """
+    for _, title in headlines:
+        for pattern in patterns:
+            m = re.search(pattern, title)
+            if m:
+                return m.group(0).strip()
+    return None
 
 def get_long_term_data() -> Dict[str, str]:
     """
-    波段持股水位 (Monthly): 分別抓取四個指標，確保每個都抓到。
+    波段持股水位 (Monthly): US CPI, TW Export, PMI, Light Signal
+    策略: Regex 實字抓取為主， AI 補充分析為辅
     """
-    indicators = {
-        "cpi": "美國最新 CPI 年增率 實際值",
-        "pmi": "美國最新 ISM 製造業 PMI 實際值",
-        "export": "台灣最新 外銷訂單 年增率 YoY",
-        "signal": "台灣最新 景氣燈號 分數 燈號"
-    }
-    
-    results = {}
-    base_url = "https://news.google.com/rss/search"
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
-    model = get_model()
+    results = {"cpi": "需查詢", "export": "需查詢", "pmi": "需查詢", "signal": "需查詢"}
 
-    for key, query in indicators.items():
-        print(f"正在抓取指標: {key}...")
-        collected_info = ""
+    # ---- 1. US CPI ----
+    headlines = _fetch_rss_headlines("美國 CPI 年增率")
+    # 充分考慮中文標題中的 "年增x%" 、"CPI年增x%" 、"CPI x%" 之類
+    val = _extract_number_from_headlines(headlines, [
+        r'年增[率]?\s*([\d.]+\s*%)',
+        r'CPI[^\d]*([\d.]+\s*%)',
+        r'([\d.]+)\s*%.*CPI',
+    ])
+    if val:
+        results["cpi"] = val
+    else:
+        # AI 備案
         try:
-            params = {"q": query, "hl": "zh-TW", "gl": "TW", "ceid": "TW:zh-Hant"}
-            resp = requests.get(base_url, params=params, headers=headers, timeout=10)
-            if resp.status_code == 200:
-                root = ET.fromstring(resp.content)
-                items = root.findall(".//item")
-                for item in items[:8]:
-                    collected_info += f"- {item.find('title').text} ({item.find('pubDate').text})\n"
-        except:
-            pass
+            news_text = "\n".join(f"[{d}] {t}" for d, t in headlines[:5])
+            model = get_model()
+            r = model.generate_content(f"從以下新聞找出美國最近一期CPI年增率的實際數值，直接回傳數字如 3.2%，沒有就回傳空白：\n{news_text}")
+            v = r.text.strip()
+            if re.search(r'[\d.]+\s*%', v):
+                results["cpi"] = v
+        except: pass
 
-        if not collected_info:
-            results[key] = "暫無數據"
-            continue
-
-        # 針對單一指標進行強制解析
-        prompt = f"""
-        你是財經數據分析專家。請從以下新聞中找出「{indicators[key]}」的最新「實際數值」。
-        
-        新聞資料：
-        {collected_info}
-        
-        規則：
-        1. 只要最新的實際值（例如: 3.1% 或 48.5 或 綠燈24分）。
-        2. 不要預測值。
-        3. 輸出必須簡短，不准有 Markdown，直接給出數值。
-        4. 若找不到精確數字，請根據標題給出最接近的現狀描述（例如: 維持高檔、持續萎縮）。
-        """
+    # ---- 2. US PMI ----
+    headlines = _fetch_rss_headlines("美國 ISM 製造業 PMI")
+    val = _extract_number_from_headlines(headlines, [
+        r'PMI[^\d]*([\d.]+)',
+        r'([\d.]+)[^\d]*PMI',
+        r'製造業[^\d]*([\d.]+)',
+    ])
+    if val:
+        results["pmi"] = val
+    else:
         try:
-            response = model.generate_content(prompt)
-            val = response.text.strip().replace("\"", "").replace("'", "")
-            results[key] = val if val else "需查詢"
-        except:
-            results[key] = "解析失敗"
-            
+            news_text = "\n".join(f"[{d}] {t}" for d, t in headlines[:5])
+            model = get_model()
+            r = model.generate_content(
+                f"從以下新聞找出美國最近一期ISM製造業PMI的實際數字。"
+                f"只請輸出純數字（例如: 48.5），不要任何文字。找不到就回傳空白：\n{news_text}"
+            )
+            v = r.text.strip()[:10]  # 截斷保護
+            m = re.search(r'[\d.]+', v)
+            if m:
+                results["pmi"] = m.group(0)
+        except: pass
+
+    # ---- 3. 台灣外銷訂單 ----
+    headlines = _fetch_rss_headlines("台灣 外銷訂單 年增率")
+    val = _extract_number_from_headlines(headlines, [
+        r'年[增减減][率]?\s*([\+\-]?[\d.]+\s*%)',
+        r'([\+\-]?[\d.]+\s*%).*外銷',
+        r'外銷[^\d]*([\d.]+\s*%)',
+    ])
+    if val:
+        results["export"] = val
+    else:
+        try:
+            news_text = "\n".join(f"[{d}] {t}" for d, t in headlines[:5])
+            model = get_model()
+            r = model.generate_content(f"從以下新聞找出台灣最近一期外銷訂單年增率的實際數值，直接回傳如 +5.2% 或 -1.3%，沒有就回傳空白：\n{news_text}")
+            v = r.text.strip()
+            if re.search(r'[\d.]+\s*%', v):
+                results["export"] = v
+        except: pass
+
+    # ---- 4. 台灣景氣燈號 ----
+    headlines = _fetch_rss_headlines("台灣 景氣燈號 分數")
+    # 先傳燈號名稱
+    val = _extract_number_from_headlines(headlines, [
+        r'((?:紅|黃紅|黃|綠|藍|低迷|熱絡)[燈])[^\d]{0,10}(\d+)[\s分]',
+        r'(\d+)[\s分].*?((?:紅|黃紅|黃|綠|藍)[燈])',
+    ])
+    if val:
+        results["signal"] = val
+    else:
+        # 先在標題裡找 燈+分數 組合
+        for _, title in headlines[:8]:
+            m = re.search(r'((?:紅|黃紅|黃|綠|藍)燈)[^0-9]{0,15}([0-9]+)[分分]', title)
+            if m:
+                results["signal"] = f"{m.group(1)} {m.group(2)}分"
+                break
+            m2 = re.search(r'([0-9]+)[分分][^0-9]{0,5}((?:紅|黃紅|黃|綠|藍)燈)', title)
+            if m2:
+                results["signal"] = f"{m2.group(2)} {m2.group(1)}分"
+                break
+        
+        if results["signal"] == "需查詢":
+            try:
+                news_text = "\n".join(f"[{d}] {t}" for d, t in headlines[:5])
+                model = get_model()
+                r = model.generate_content(f"從以下新聞找出台灣最近一期景氣燈號與分數，直接回傳如 綠燈24分 或 黃紅燈35分，沒有就回傳空白：\n{news_text}")
+                v = r.text.strip()
+                if v:
+                    results["signal"] = v
+            except: pass
+
+    print(f"[Macro Data] {results}")
     return results
+
 
 
 def get_fx_data(market_name: str) -> str:
