@@ -447,30 +447,37 @@ def get_stock_data_with_name(ticker):
     """
     try:
         t = str(ticker).strip()
-        if t.isdigit() and len(t) == 4:
-            t = f"{t}.TW"
+        symbols = [f"{t}.TW", f"{t}.TWO"] if t.isdigit() and len(t) == 4 else [t]
         
-        stock = yf.Ticker(t)
-        df = stock.history(period="250d") 
-        if df.empty and ".TW" in t:
-            t = t.replace(".TW", ".TWO")
-            stock = yf.Ticker(t)
-            df = stock.history(period="250d")
+        df = pd.DataFrame()
+        final_t = symbols[0]
+        
+        for sym in symbols:
+            try:
+                stock = yf.Ticker(sym)
+                df = stock.history(period="250d")
+                if not df.empty:
+                    final_t = sym
+                    break
+            except:
+                continue
         
         if not df.empty:
-            # 優先從 Ticker.info 抓取名稱，不再檢查中文對照表，直接使用 yf 提供之原始名稱 (通常為英文)
+            # 優先從 Ticker.info 抓取名稱
             name = ""
             try:
-                info = stock.info
+                stock_obj = yf.Ticker(final_t)
+                info = stock_obj.info
                 name = info.get('longName') or info.get('shortName', '')
             except:
                 name = ""
             
             # 清理代號顯示 (移除 .TW .TWO)
-            pure_id = t.replace(".TW", "").replace(".TWO", "")
+            pure_id = final_t.replace(".TW", "").replace(".TWO", "")
             
-            return df.reset_index(), t, pure_id, name
-        return None, t, ticker, ""
+            return df.reset_index(), final_t, pure_id, name
+        return None, final_t, ticker, ""
     except Exception:
         return None, ticker, ticker, ""
+
 
