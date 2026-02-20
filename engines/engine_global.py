@@ -112,100 +112,60 @@ import xml.etree.ElementTree as ET
 
 def get_long_term_data() -> Dict[str, str]:
     """
-    波段持股水位 (Monthly): US CPI, TW Export, PMI, Light Signal
-    改進版 v3: 使用 Google News RSS Feed (最穩定、無需爬蟲對抗) + LLM 提取
+    波段持股水位 (Monthly): 分別抓取四個指標，確保每個都抓到。
     """
-    data_defaults = {"cpi": "需查詢", "export": "需查詢", "pmi": "需查詢", "signal": "需查詢"}
-    
-    collected_info = ""
-    
-    # 定義精準的 RSS 搜尋關鍵字 (搜尋最新數據)
-    queries = [
-        ("cpi", "美國最新 CPI 年增率 實際值"),
-        ("pmi", "美國最新 ISM 製造業 PMI 實際值"),
-        ("export", "台灣最新 外銷訂單 年增率 實際值"),
-        ("signal", "台灣最新 景氣燈號 分數 實際值")
-    ]
-    
-    base_url = "https://news.google.com/rss/search"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    indicators = {
+        "cpi": "美國最新 CPI 年增率 實際值",
+        "pmi": "美國最新 ISM 製造業 PMI 實際值",
+        "export": "台灣最新 外銷訂單 年增率 YoY",
+        "signal": "台灣最新 景氣燈號 分數 燈號"
     }
-
-    print("Fetching macro data via Google News RSS...")
     
-    for key, q in queries:
+    results = {}
+    base_url = "https://news.google.com/rss/search"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+    model = get_model()
+
+    for key, query in indicators.items():
+        print(f"正在抓取指標: {key}...")
+        collected_info = ""
         try:
-            params = {
-                "q": q,
-                "hl": "zh-TW",
-                "gl": "TW",
-                "ceid": "TW:zh-Hant"
-            }
+            params = {"q": query, "hl": "zh-TW", "gl": "TW", "ceid": "TW:zh-Hant"}
             resp = requests.get(base_url, params=params, headers=headers, timeout=10)
-            
             if resp.status_code == 200:
-                try:
-                    root = ET.fromstring(resp.content)
-                    items = root.findall(".//item")
-                    
-                    collected_info += f"\n--- {key.upper()} 相關新聞 ---\n"
-                    # 取前 5 則最新新聞的標題與時間
-                    for item in items[:5]:
-                        title = item.find("title").text
-                        pub_date = item.find("pubDate").text
-                        collected_info += f"[{pub_date}] {title}\n"
-                except ET.ParseError:
-                    print(f"RSS Parse Error for {key}")
-            else:
-                print(f"RSS Request failed for {key}: {resp.status_code}")
-                
-        except Exception as e:
-            print(f"Error fetching {key}: {e}")
+                root = ET.fromstring(resp.content)
+                items = root.findall(".//item")
+                for item in items[:8]:
+                    collected_info += f"- {item.find('title').text} ({item.find('pubDate').text})\n"
+        except:
+            pass
 
-    if not collected_info:
-        return data_defaults
+        if not collected_info:
+            results[key] = "暫無數據"
+            continue
 
-    # LLM Parsing
-    try:
-        model = get_model()
+        # 針對單一指標進行強制解析
         prompt = f"""
-        你是一個精準的財經數據提取專家。請從以下新聞標題與發佈時間中，提取「最新公佈」的數值。
+        你是財經數據分析專家。請從以下新聞中找出「{indicators[key]}」的最新「實際數值」。
         
-        任務：
-        1. 找出最新的數值。
-        2. 若標題提到「x月公佈為y%」，請提取 y%。
-        3. 請忽略「市場預期」、「專家預測」等字眼，只要「實際值」(Actual)。
-        
-        請提取這四個項目:
-        - cpi: 美國 CPI 年增率 (例如: 3.1%)
-        - export: 台灣外銷訂單年增率 (例如: -2.3% 或 1.2%)
-        - pmi: 美國 ISM 製造業指數 (例如: 48.5)
-        - signal: 台灣景氣燈號與分數 (例如: 綠燈 24分)
-
-        數據源：
+        新聞資料：
         {collected_info}
-
-        回傳 JSON 格式 (嚴禁包含 Markdown 或多餘解釋)：
-        {{"cpi": "...", "export": "...", "pmi": "...", "signal": "..."}}
-        若真的找不到，請根據新聞趨勢給出一個最可能的近期數值，不要輕易回傳「需查詢」。
+        
+        規則：
+        1. 只要最新的實際值（例如: 3.1% 或 48.5 或 綠燈24分）。
+        2. 不要預測值。
+        3. 輸出必須簡短，不准有 Markdown，直接給出數值。
+        4. 若找不到精確數字，請根據標題給出最接近的現狀描述（例如: 維持高檔、持續萎縮）。
         """
-        
-        response = model.generate_content(prompt)
-        res_text = response.text
-        
-        import json, re
-        match = re.search(r'\{.*\}', res_text, re.DOTALL)
-        if match:
-            extracted = json.loads(match.group())
-            for k in data_defaults:
-                if extracted.get(k) and extracted.get(k) not in ["需查詢", "N/A"]:
-                    data_defaults[k] = extracted[k]
-                    
-    except Exception as e:
-        print(f"LLM Parsing failed: {e}")
-        
-    return data_defaults
+        try:
+            response = model.generate_content(prompt)
+            val = response.text.strip().replace("\"", "").replace("'", "")
+            results[key] = val if val else "需查詢"
+        except:
+            results[key] = "解析失敗"
+            
+    return results
+
 
 def get_fx_data(market_name: str) -> str:
     """
