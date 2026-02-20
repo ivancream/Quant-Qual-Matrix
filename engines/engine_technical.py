@@ -98,6 +98,8 @@ def fetch_data(stock_id: str, period: str = "1y") -> Optional[pd.DataFrame]:
         
     return df
 
+def get_symbol_name(stock_id: str) -> str:
+    """ 嘗試獲取股票名稱 """
     try:
         stock_id = str(stock_id).strip()
         symbols = [f"{stock_id}.TW", f"{stock_id}.TWO"] if stock_id.isdigit() else [stock_id]
